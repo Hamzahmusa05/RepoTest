@@ -1,0 +1,36 @@
+version: 0.2
+
+env:
+  variables:
+    TEMPLATE_FILE: template.yaml
+    STACK_NAME: WebServerStack
+    DO_DEPLOY: "false"
+    MY_IP: "0.0.0.0/0"   # override in CodeBuild env for your /32
+
+phases:
+  install:
+    commands:
+      - pip3 install --upgrade cfn-lint
+      - aws --version
+  build:
+    commands:
+      - echo "Linting..."
+      - cfn-lint ${TEMPLATE_FILE}
+      - echo "Validating..."
+      - aws cloudformation validate-template --template-body file://${TEMPLATE_FILE}
+      - |
+        if [ "${DO_DEPLOY}" = "true" ]; then
+          echo "Deploying ${STACK_NAME}..."
+          aws cloudformation deploy \
+            --template-file ${TEMPLATE_FILE} \
+            --stack-name ${STACK_NAME} \
+            --parameter-overrides MyIP=${MY_IP} \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+          echo "Done."
+        else
+          echo "Skipping deploy (DO_DEPLOY=false)."
+        fi
+
+artifacts:
+  files:
+    - template.yaml
